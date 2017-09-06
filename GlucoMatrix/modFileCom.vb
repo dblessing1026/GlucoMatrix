@@ -2,7 +2,7 @@
 Imports System.IO
 Imports System.Xml.Serialization
 
-Public Module modFileComm
+Public Module modFileCom
     Dim swDataFile As StreamWriter  'StreamWriter for data file, to remain open until test is complete
     Public boolDataFileOpen As Boolean 'flag to indicate if the data file has been sucessfully created
 

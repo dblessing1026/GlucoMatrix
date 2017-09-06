@@ -1,8 +1,11 @@
-﻿' -------------------------------------------------------------------------
+﻿Option Explicit On
+Imports System.Data.SqlClient
+
+' -------------------------------------------------------------------------
 ' frmMain is, as the name indicates, the main form from which all functions
 ' are available.  Nothing too interesting happens here.
 ' ------------------------------------------------------------------------
-Option Explicit On
+
 Public Class frmMain
 
     ' ------------------------------------------

@@ -28,8 +28,8 @@ Partial Class frmTestForm
         Dim Legend1 As System.Windows.Forms.DataVisualization.Charting.Legend = New System.Windows.Forms.DataVisualization.Charting.Legend()
         Dim Series1 As System.Windows.Forms.DataVisualization.Charting.Series = New System.Windows.Forms.DataVisualization.Charting.Series()
         Me.MainLoop = New System.ComponentModel.BackgroundWorker()
-        Me.TestChart = New System.Windows.Forms.DataVisualization.Charting.Chart()
         Me.Panel1 = New System.Windows.Forms.Panel()
+        Me.TestChart = New System.Windows.Forms.DataVisualization.Charting.Chart()
         Me.Panel4 = New System.Windows.Forms.Panel()
         Me.btnApply = New System.Windows.Forms.Button()
         Me.chkScrollEnabled = New System.Windows.Forms.CheckBox()
@@ -59,8 +59,8 @@ Partial Class frmTestForm
         Me.Label7 = New System.Windows.Forms.Label()
         Me.ElapsedTimer = New System.Windows.Forms.Timer(Me.components)
         Me.InjectionTimer = New System.Windows.Forms.Timer(Me.components)
-        CType(Me.TestChart, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.Panel1.SuspendLayout()
+        CType(Me.TestChart, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.Panel4.SuspendLayout()
         Me.Panel2.SuspendLayout()
         Me.flwInjections.SuspendLayout()
@@ -69,6 +69,13 @@ Partial Class frmTestForm
         '
         'MainLoop
         '
+        '
+        'Panel1
+        '
+        Me.Panel1.Controls.Add(Me.TestChart)
+        Me.Panel1.Controls.Add(Me.Panel4)
+        resources.ApplyResources(Me.Panel1, "Panel1")
+        Me.Panel1.Name = "Panel1"
         '
         'TestChart
         '
@@ -83,13 +90,6 @@ Partial Class frmTestForm
         Series1.Legend = "Legend1"
         Series1.Name = "Series1"
         Me.TestChart.Series.Add(Series1)
-        '
-        'Panel1
-        '
-        Me.Panel1.Controls.Add(Me.TestChart)
-        Me.Panel1.Controls.Add(Me.Panel4)
-        resources.ApplyResources(Me.Panel1, "Panel1")
-        Me.Panel1.Name = "Panel1"
         '
         'Panel4
         '
@@ -281,8 +281,8 @@ Partial Class frmTestForm
         Me.Controls.Add(Me.HideShowSensors)
         Me.Controls.Add(Me.Panel2)
         Me.Name = "frmTestForm"
-        CType(Me.TestChart, System.ComponentModel.ISupportInitialize).EndInit()
         Me.Panel1.ResumeLayout(False)
+        CType(Me.TestChart, System.ComponentModel.ISupportInitialize).EndInit()
         Me.Panel4.ResumeLayout(False)
         Me.Panel4.PerformLayout()
         Me.Panel2.ResumeLayout(False)
@@ -294,7 +294,6 @@ Partial Class frmTestForm
 
     End Sub
     Friend WithEvents MainLoop As System.ComponentModel.BackgroundWorker
-    Friend WithEvents TestChart As System.Windows.Forms.DataVisualization.Charting.Chart
     Friend WithEvents Panel1 As System.Windows.Forms.Panel
     Friend WithEvents Panel4 As System.Windows.Forms.Panel
     Friend WithEvents btnApply As System.Windows.Forms.Button
@@ -325,4 +324,5 @@ Partial Class frmTestForm
     Friend WithEvents ElapsedTimer As System.Windows.Forms.Timer
     Friend WithEvents txtTime As System.Windows.Forms.Label
     Friend WithEvents InjectionTimer As System.Windows.Forms.Timer
+    Friend WithEvents TestChart As DataVisualization.Charting.Chart
 End Class

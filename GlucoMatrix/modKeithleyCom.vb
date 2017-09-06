@@ -4,58 +4,12 @@ Imports System.Net.Sockets
 Imports System.Runtime.InteropServices
 
 
-Public Module modKeithleyComm
+Public Module modKeithleyCom
     'Variables for network communication
     Public switchDriver As New TcpClient
     Public switchStream As NetworkStream
 
-    ' Device I/O and Configuration Functions
-    ' -----------------------------------------------------------------
-    ' Name: EstablishIO()
-    ' Returns: Boolean: Indicates success / failure
-    ' Description: Attempts to initialize the switchDriver with hard-coded configuration settings
-    Public Function EstablishIO() As Boolean
-        Try
-            If (boolConfigStatus) Then
-                If (switchDriver.Connected) Then
-                    boolIOStatus = True
-                    Return True
-                Else
-                    'Dim strOptions As String
-                    ' An option string must be explicitly declared or the driver throws a COMException.
-                    EstablishKeithleyIO(cfgGlobal.Address)
-                    If (switchDriver.Connected) Then
-                        ' reset the TSPLink so we can communicate with the source meter
-                        SwitchIOWrite("tsplink.reset()")
-                        SwitchIOWrite("node[2].display.clear()")
-                        SwitchIOWrite("node[2].display.settext('TspLink Reset')")
-                        'Update UI and return true
-                        boolIOStatus = True
-                        Return True
-                    Else
-                        ' Update the UI and return false
-                        boolIOStatus = False
-                        Return False
-                    End If
-                End If
-            Else
-                ' Update the UI and return false
-                boolIOStatus = False
-                Return False
-            End If
-        Catch comEx As COMException
-            ComExceptionHandler(comEx)
-            ' Update the UI and return false
-            boolIOStatus = False
-            switchDriver.Close()
-            Return False
-        Catch ex As Exception
-            GenericExceptionHandler(ex)
-            ' Update the UI and return false
-            boolIOStatus = False
-            Return False
-        End Try
-    End Function
+
     ' Name: EstablishKeithleyIO()
     ' Parameters:
     '           strIPAddress: A string containing the IP Address of the measurement hardware
@@ -105,8 +59,18 @@ Public Module modKeithleyComm
             SwitchIOWrite("node[2].display.clear()")
             SwitchIOWrite("node[2].display.settext('TspLink Reset')")
 
+            'Set slots 3-6 to have psuedo (remove when there are really 6 cards) - DB 12Jul2017
+            'SwitchIOWrite("slot[3].pseudocard = slot.PSEUDO_NONE")
+            'SwitchIOWrite("slot[4].pseudocard = slot.PSEUDO_NONE")
+            'SwitchIOWrite("slot[5].pseudocard = slot.PSEUDO_NONE")
+            'SwitchIOWrite("slot[6].pseudocard = slot.PSEUDO_NONE")
+            'SwitchIOWrite("slot[3].pseudocard = slot.PSEUDO_3730")
+            'SwitchIOWrite("slot[4].pseudocard = slot.PSEUDO_3730")
+            'SwitchIOWrite("slot[5].pseudocard = slot.PSEUDO_3730")
+            'SwitchIOWrite("slot[6].pseudocard = slot.PSEUDO_3730")
+
             'Upload Sensor Switch patterns
-            SetSwitchPatterns(33)
+            SetSwitchPatterns(97)
 
             'Update the Comm status flag
             boolIOStatus = True
@@ -279,19 +243,69 @@ Public Module modKeithleyComm
         Dim strPattern As String
         Dim i As Integer
         Dim j As Integer
+        Dim k As Integer
+        Dim intNumCards As Integer
+        Dim intSensorCounter As Integer = 1
 
-        'Generate the switch closure patterns for all 32 measurement patterns
-        For i = 1 To intSensors - 1
-            strPattern = "'"
-            For j = 1 To intSensors - 1
-                If j = i Then
-                    strPattern = strPattern + SwitchNumberGenerator(2, j) + ","
+        '   The following is legacy code for setting switch patterns for use with "exclusiveclose", 
+        '   which requires calling out all switches that should be closed.  This worked with 32 
+        '   channels, but there is not enough memory to set switch patterns for 96 channels.  As
+        '   such, the routine will be modified to support "exclusiveslotclose", in which only a
+        '   single slot's worth of closures will be called out.
+        '       'Generate the switch closure patterns for all 32 measurement patterns
+        '       For i = 1 To intSensors - 1
+        '           strPattern = "'"
+        '           For j = 1 To intSensors - 1
+        '               If j = i Then
+        '                   strPattern = strPattern + SwitchNumberGenerator(2, j) + ","
+        '               Else
+        '                   strPattern = strPattern + SwitchNumberGenerator(1, j) + ","
+        '               End If
+        '           Next
+        '           strPattern = strPattern + "1911,1912,2911,2912'"
+        '           SwitchIOWrite("channel.pattern.setimage(" & strPattern & ", 'Sensor" & i & "')")
+        '       Next
+
+        '       'generate the switch closure patterns for all closed on row 1
+        '       strPattern = "'"
+        '       For j = 1 To intSensors - 1
+        '           strPattern = strPattern + SwitchNumberGenerator(1, j) + ","
+        '       Next
+        '       strPattern = strPattern + "1911,1912,2911,2912'"
+        '       SwitchIOWrite("channel.pattern.setimage(" & strPattern & ", 'Sensor" & intSensors & "')")
+
+        ' New strategy: Use nested loops to calculate the patterns for the current card only, except for column 1,
+        '               which will need to close all the columns on the previous card
+
+        intNumCards = intSensors \ 16
+
+        For i = 1 To intNumCards        'Outer loop for card slots
+            For j = 1 To 16             'middle loop for columns in card
+                strPattern = "'"        'Clear the pattern string
+                If j = 1 And i > 1 Then     'Check if it's the first column of the card.  the previous card's columns will need to be closed, except card 1
+                    For k = 1 To 16
+                        If k = j Then
+                            strPattern = strPattern & CStr(i) & (CStr(2)) & Format(k, "00") & ","
+                            strPattern = strPattern & CStr(i - 1) & (CStr(1)) & Format(k, "00") & ","
+                        Else
+                            strPattern = strPattern & CStr(i) & (CStr(1)) & Format(k, "00") & ","
+                            strPattern = strPattern & CStr(i - 1) & (CStr(1)) & Format(k, "00") & ","
+                        End If
+                    Next
+                    strPattern = strPattern & CStr(i) & "911," & CStr(i) & "912,"
+                    strPattern = strPattern & CStr(i - 1) & "911," & CStr(i - 1) & "912'"
                 Else
-                    strPattern = strPattern + SwitchNumberGenerator(1, j) + ","
+                    For k = 1 To 16
+                        If k = j Then
+                            strPattern = strPattern & CStr(i) & (CStr(2)) & Format(k, "00") & ","
+                        Else
+                            strPattern = strPattern & CStr(i) & (CStr(1)) & Format(k, "00") & ","
+                        End If
+                    Next
+                    strPattern = strPattern & CStr(i) & "911," & CStr(i) & "912'"
                 End If
+                SwitchIOWrite("channel.pattern.setimage(" & strPattern & ", 'Sensor" & (i - 1) * 16 + j & "')")
             Next
-            strPattern = strPattern + "1911,1912,2911,2912'"
-            SwitchIOWrite("channel.pattern.setimage(" & strPattern & ", 'Sensor" & i & "')")
         Next
 
         'generate the switch closure patterns for all closed on row 1
@@ -299,8 +313,10 @@ Public Module modKeithleyComm
         For j = 1 To intSensors - 1
             strPattern = strPattern + SwitchNumberGenerator(1, j) + ","
         Next
-        strPattern = strPattern + "1911,1912,2911,2912'"
+        strPattern = strPattern + "1911,1912,2911,2912,3911,3912,4911,4912,5911,5912,6911,6912'"
         SwitchIOWrite("channel.pattern.setimage(" & strPattern & ", 'Sensor" & intSensors & "')")
+
+
 
     End Sub
     ' Name: SwitchNumberGenerator()
@@ -308,7 +324,7 @@ Public Module modKeithleyComm
     '           strCommand: A string containing the tsp command to be sent to the measurement hardware
     ' Description: This command will send a command to the measurement hardware and check to see if an error is generated.
     Public Function SwitchNumberGenerator(intRow As Integer, intColumn As Integer)
-        Dim strSwitchNumber As String
+        Dim strSwitchNumber As String = ""
 
         'Matrix card notation: SRCC, S=slot, R=row, CC=column
         'Determine Slot (card)
