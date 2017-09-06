@@ -27,21 +27,14 @@ Public Class clsConfiguration
     Dim dblAuditCheckTolerance As Double = 0.1  ' The audit check tolerance expressed as a % error from nominal expected current.  Valid values are 0 - 1 inclusive
     Dim intCardConfig As Integer = 2
     Dim boolSensorNaming As Boolean = False
-    Dim strBath1 As String = "1 mM Glucose"
-    Dim strBath2 As String = "2.2 mM Glucose"
-    Dim strBath3 As String = "5 mM Glucose"
-    Dim strBath4 As String = "5 mM Glucose + 0.1 mM APAP"
-    Dim strBath5 As String = "10 mM Glucose"
-    Dim strBath6 As String = "16 mM Glucose"
-
 
     ' The Address and STAID properties are dependent on the PC/Hardware configuration and cannot be assigned default values
     Dim strAddress As String
     Dim strSTAID As String
-    Dim strSQLServer As String
 
     ' Set default save paths based on installation directory (strAppDir)
     Dim strDumpDirectory As String = strAppDir & Path.DirectorySeparatorChar & "RawTestData"
+    Private strSQLServer As String
     'Dim strSystemFileDirectory As String = strAppDir & Path.DirectorySeparatorChar & "SystemInfo"
     Public Property AuditZero As Double
         Get
@@ -59,6 +52,14 @@ Public Class clsConfiguration
             aryResistorNominalValues = aryValue
         End Set
     End Property
+    'Public Property SystemFileDirectory As String
+    '    Get
+    '        Return strSystemFileDirectory
+    '    End Get
+    '    Set(ByVal strValue As String)
+    '        strSystemFileDirectory = strValue
+    '    End Set
+    'End Property
     Public Property AuditTolerance As Double
         Get
             Return dblAuditCheckTolerance
@@ -171,55 +172,6 @@ Public Class clsConfiguration
             strSQLServer = strValue
         End Set
     End Property
-    Public Property Bath1 As String
-        Get
-            Return strBath1
-        End Get
-        Set(ByVal strValue As String)
-            strBath1 = strValue
-        End Set
-    End Property
-    Public Property Bath2 As String
-        Get
-            Return strBath2
-        End Get
-        Set(ByVal strValue As String)
-            strBath2 = strValue
-        End Set
-    End Property
-    Public Property Bath3 As String
-        Get
-            Return strBath3
-        End Get
-        Set(ByVal strValue As String)
-            strBath3 = strValue
-        End Set
-    End Property
-    Public Property Bath4 As String
-        Get
-            Return strBath4
-        End Get
-        Set(ByVal strValue As String)
-            strBath4 = strValue
-        End Set
-    End Property
-    Public Property Bath5 As String
-        Get
-            Return strBath5
-        End Get
-        Set(ByVal strValue As String)
-            strBath5 = strValue
-        End Set
-    End Property
-    Public Property Bath6 As String
-        Get
-            Return strBath6
-        End Get
-        Set(ByVal strValue As String)
-            strBath6 = strValue
-        End Set
-    End Property
-
 
     ' Name: WriteToFile()
     ' Parameters:

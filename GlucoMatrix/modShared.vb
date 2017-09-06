@@ -22,7 +22,7 @@ Public Module modShared
     '           strNPLC: the Number of PowerLine Cycles for each reading
     ' Description: This subroutine will configure both channels of the SourceMeter to the parameters passed to the subroutine.
 
-    Public Sub ConfigureHardware(strVolts As String, strCurrent As String, strFilter As String, _
+    Public Sub ConfigureHardware(strVolts As String, strCurrent As String, strFilter As String,
                                     strCount As String, strNPLC As String)
         ' Start with all intersections open
         SwitchIOWrite("channel.open('allslots')")
@@ -84,6 +84,49 @@ Public Module modShared
         SwitchIOWrite("node[2].smua.source.output = 1")
         SwitchIOWrite("node[2].smub.source.output = 1")
     End Sub
+
+    Function ReadIV(intSensor As Integer)
+        Dim strReading As String
+        Dim strValues() As String = Nothing
+        Dim decReading() As Decimal = {0, 0}
+
+        'Read IV from SourceMeter
+        If intSensor = 97 Then
+            strReading = SwitchIOWriteRead("node[1].channel.exclusiveslotclose('Sensor" & intSensor & "');delay(" & cfgRecipe.SettlingTime / 1000 &
+                                           ");print(node[2].smua.measure.iv())")
+        Else
+            strReading = SwitchIOWriteRead("node[1].channel.exclusiveslotclose('Sensor" & intSensor & "');delay(" & cfgRecipe.SettlingTime / 1000 &
+                                           ");print(node[2].smub.measure.iv())")
+        End If
+
+        'Parse the reading into an Decimal Array
+        strValues = strReading.Split(vbTab)
+        decReading(0) = CDec(strValues(0))
+        decReading(1) = CDec(strValues(1))
+
+        'Return the readings array
+        Return decReading
+
+    End Function
+
+    Function GetBathSensor(ByRef intSensorNumber As Int32)
+        Dim intBathSensor() As Int32 = {0, 0}
+
+        intBathSensor(1) = intSensorNumber Mod 16
+
+        If intBathSensor(1) = 0 Then
+            intBathSensor(0) = (intSensorNumber \ 16)
+            intBathSensor(1) = 16
+        Else
+            intBathSensor(0) = (intSensorNumber \ 16) + 1
+        End If
+
+        Return intBathSensor
+
+    End Function
+
+
+
     Public Sub EndTest()
 
         'Things to do if communication is open:
@@ -175,36 +218,4 @@ Public Module modShared
         End Try
     End Sub
 
-    '' Description: Checks user inputs against a set of formatting / data type rules
-    'Private Function ValidateForm() As Boolean
-    '    ' Check each field against its requirements and return true/false
-    '    Try
-    '        Dim boolValidates As Boolean = True
-    '        ' Check that operator initials are alpha-only and non-empty
-    '        Dim regexObj As New System.Text.RegularExpressions.Regex("^[a-zA-Z][a-zA-Z]*$")
-    '        If Not (regexObj.IsMatch(txtOperatorInitials.Text)) Then
-    '            boolValidates = False
-    '        End If
-
-    '        ' Check Test Name.  Must be non-null
-    '        If (txtTestName.Text = "") Then
-    '            boolValidates = False
-    '        End If
-    '        ' Check Card tabs.  Must be non-null
-    '        For Each aTab In Tabs.TabPages
-    '            If (aTab.Enabled) Then
-    '                ' check all fields for blankness
-    '                For Each aControl In aTab.Controls
-    '                    If (aControl.GetType() = GetType(System.Windows.Forms.TextBox) And aControl.Text = "") Then
-    '                        boolValidates = False
-    '                    End If
-    '                Next
-    '            End If
-    '        Next
-    '        Return boolValidates
-    '    Catch ex As Exception
-    '        GenericExceptionHandler(ex)
-    '        Return False
-    '    End Try
-    'End Function
 End Module

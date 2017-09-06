@@ -1,12 +1,6 @@
 ﻿Option Explicit On
-Imports System
-Imports System.IO
 Imports System.Windows.Forms.DataVisualization.Charting
-'Imports Keithley.Ke37XX
-'Imports Ivi.Driver.Interop
-'Imports Keithley.Ke37XX.Interop
 Imports System.Runtime.InteropServices
-Imports System.Xml.Serialization
 ' --------------------------------------------------------------------------------------------------
 ' frmTestForm is the interface presented to the user during the actual conduct of a sensor test.
 ' It contains the following major components:
@@ -31,104 +25,25 @@ Public Class frmTestForm
     Dim strCardConfig As String
     Dim intTimeInterval As Integer      ' IntTimeInterval = intReading * intInterval
 
+    Dim stpInjectionTime As New Stopwatch    ' Stopwatch to track the time since the last noted injection
+    Dim stpTotalTime As New Stopwatch        ' Stopwatch to track the total elapsed time in the test
+    Dim intInjectionCounter As Integer       ' Counter for the number of injections that have been performed
+
+
+    ' All variables prefaced with current- are declared with
+    ' module-level scope so that cross-thread references can be made without throwing an exception
+    Dim lngCurrentTime As Long              ' Timestamp for last gathered reading
+    Dim dblCurrentCurrent As Double         ' Current for last gathered reading
+    Dim intCurrentSlot As Integer           ' Card slow for last gathered reading
+    Dim intCurrentColumn As Integer         ' Card column for last gathered reading
+    Public strCurrentID As String              ' SensorID for last gathered reading
 
 
 
-    
-    ' Name: TestForm_FormClosing()
-    ' Handles: User closes frmTestForm
-    ' Description: Behavior is dependent on the state of the test.  If the MainLoop is still running, it warns the user they cannot close the 
-    ' form while the test is running.  Otherwise it closes the test form and resets the switchdriver and its attendant UI element
-    ' indicating IO has been broken.
-    Private Sub TestForm_FormClosing(ByVal sender As Object, ByVal e As System.Windows.Forms.FormClosingEventArgs) Handles Me.FormClosing
-        Try
-            ' Close the instrument connection when exiting the test form
-            If boolIsTestStopped Then
-                Me.Hide()
-                frmMain.btnConfig.Enabled = True
-                frmMain.btnNewTest.Enabled = True
-                EndTest()
-
-            Else
-                e.Cancel = True
-                MsgBox("Cannot close test form while test is running.  Stop test and close form.", vbOKOnly)
-            End If
-        Catch comEx As COMException
-            ComExceptionHandler(comEx)
-        Catch ex As Exception
-            GenericExceptionHandler(ex)
-        End Try
-    End Sub
-    ' Name: TestForm_Load()
-    ' Handles: The frmTestForm is opened
-    ' Description: Enabled the start and note injection buttons, populates the form with test specific data
-    ' and sets the display text on the SMU to indicate readiness to perform a test
-    Private Sub TestForm_Load(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Load
-        TestFormLoaded()
-    End Sub
-
-    Private Sub TestFormLoaded()
-        Try
-            btnStartTest.Show()
-            btnNoteInjection.Show()
-            ' Set the background worker to report progress so that it can make cross-thread communications to the chart updater
-            MainLoop.WorkerReportsProgress = True
-            prepareForm()
-            SwitchIOWrite("node[2].display.clear()")
-            SwitchIOWrite("node[2].display.settext('Ready to test')")
-            stpTotalTime.Reset() 'Needed to reset the clock if a second test is run - DB 05Jun2017
-            stpInjectionTime.Stop() 'Needed to reset the clock if a second test is run - DB 05Jun2017
-            stpInjectionTime.Reset() 'Needed to reset the clock if a second test is run - DB 05Jun2017
-            intInjectionCounter = 0 ' Needed to reset the number of injections in the data file if a second test is run - DB 05Jun2017
-        Catch ex As COMException
-            ComExceptionHandler(ex)
-            Me.Close()
-        Catch ex As Exception
-            GenericExceptionHandler(ex)
-            Me.Close()
-        End Try
-    End Sub
-    Private Sub MainLoop_DoWork(ByVal sender As System.Object, ByVal e As System.ComponentModel.DoWorkEventArgs) Handles MainLoop.DoWork
-        MeasurementLoop(sender, e)
-    End Sub
 
 
 
-    ' --------------------------------------------
-    ' Timer loop threads
-    ' ---------------------------------------------
-    ' Timer1_Tick and InjectionTime_Tick are both triggered every second by the Timer1 and InjectionTimer components in the user form.
-    ' There are corresponding stopwatches that are managed within the test control loop
-    ' and these are referenced within the Tick events to update the elapsed time shown to the user.
 
-    ' Name: ElapsedTimer_Tick()
-    ' Handles: Tick event for ElapsedTimer
-    ' Description: The ElapsedTimer triggers the Tick event every second.  This sub runs when this event is triggered.  
-    '           It grabs the the time elapsed in the stpTotalTime stopwatch, parses it into human-readable format and updates
-    '           the user interface
-    Private Sub ElapsedTimer_Tick(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles ElapsedTimer.Tick
-        Try
-            ' Update the total time timer in the user interface
-            txtTime.Text = "Total Time: " & Format(stpTotalTime.Elapsed.Hours, "00") & ":" & Format(stpTotalTime.Elapsed.Minutes, "00") & ":" & Format(stpTotalTime.Elapsed.Seconds, "00")
-        Catch ex As Exception
-            GenericExceptionHandler(ex)
-        End Try
-    End Sub
-    ' Name: InjectionTimer_Tick()
-    ' Handles: Tick event for InjectionTimer
-    ' Description: The InjectionTimer triggers the Tick event every second.  This sub runs when this event is triggered.  
-    '           It grabs the the time elapsed in the stpInjectionTime stopwatch, parses it into human-readable format and updates
-    '           the user interface
-    Private Sub InjectionTimer_Tick(sender As Object, e As EventArgs) Handles InjectionTimer.Tick
-        Try
-            ' Updat the time since injection in the user interface
-            If Not boolIsTestStopped Then
-                txtTimeSinceInjection.Text = "Time Since Injection: " & Format(stpInjectionTime.Elapsed.Hours, "00") & ":" & Format(stpInjectionTime.Elapsed.Minutes, "00") & ":" & Format(stpInjectionTime.Elapsed.Seconds, "00")
-            End If
-        Catch ex As Exception
-            GenericExceptionHandler(ex)
-        End Try
-    End Sub
 
     ' Name: btnNoteInjection_Click
     ' Handles: User clicks 'Note Injection' button
@@ -306,9 +221,10 @@ Public Class frmTestForm
             Dim strCurrentReadings As String    ' String for building list of current readings
             Dim intReading As Integer = 0       ' Integer for counting the number of measurements; used for calculating
             Dim intLoopSensor As Integer        ' Loop counter for main measurement loop
-            Dim dblCurrent As Double
-            Dim dblVolts As Double
+            Dim decReading() As Decimal = {0, 0}
+            Dim intBathSensor As New clsBathSensor
             Dim strData As String               ' local variable for holding data to be written to file 
+            Dim strDataInsert As String         ' string for the sql command to insert the data point
 
             ' Define Variables
             intMilliseconds = intInterval * 1000
@@ -358,7 +274,6 @@ Public Class frmTestForm
 
             'Set the flags for running the loop
             boolIsTestRunning = True
-            boolIsTestStopped = False
 
             'Run the testloop until the boolTestStop variable returns false (the user clicks Abort)
             Do While boolIsTestRunning
@@ -377,20 +292,30 @@ Public Class frmTestForm
                     ' Allow settling time
                     Delay(cfgGlobal.SettlingTime)
 
-                    ' Record V and I readings to buffer
-                    SwitchIOWrite("node[2].smub.measure.iv(node[2].smub.nvbuffer1, node[2].smub.nvbuffer2)")
-
                     ' Read V and I from buffer
-                    dblCurrent = CDbl(SwitchIOWriteRead("printbuffer(1, node[2].smub.nvbuffer1.n, node[2].smub.nvbuffer1)")) * 10 ^ 9
-                    dblVolts = CDbl(SwitchIOWriteRead("printbuffer(1, node[2].smub.nvbuffer2.n, node[2].smub.nvbuffer2)"))
+                    decReading = ReadIV(intLoopSensor)
+
+                    ' Determine Bath and Sensor ID
+
+                    intBathSensor = GetBathSensor(intLoopSensor)
 
                     ' Add reading to current and voltage strings
-                    strCurrentReadings = strCurrentReadings + CStr(dblCurrent) + ","
-                    strVoltageReadings = strVoltageReadings + CStr(dblVolts) + ","
+                    strCurrentReadings = strCurrentReadings + CStr(decReading(0)) + ","
+                    strVoltageReadings = strVoltageReadings + CStr(decReading(1)) + ","
+
+                    ' Add reading to the SQL database
+
+                    strDataInsert = "INSERT INTO tblTestReadings " &
+                                    "(lotid, sensor, bath, " &
+                                    " readingid, [current], voltage, datetime) " &
+                                    "VALUES " &
+                                    "(" & lstCarrierCurrent(intBathSensor.Bath - 1).CarrierSQLID & "," & intBathSensor.Sensor & "," & intInjectionCounter + 1 &
+                                    "," & intReading & "," & decReading(0) & "," & decReading(1) & ",'" & DateTime.Now & "')"
+                    SQLInsert(strDataInsert)
 
                     ' Update the Chart
                     strCurrentID = "Sensor" & intLoopSensor
-                    AddGraphData(strCurrentID, intTimeInterval, dblCurrent)
+                    AddGraphData(strCurrentID, intTimeInterval, decReading(0))
                 Next
 
                 ' Record the voltage and current across all sensors
@@ -401,17 +326,11 @@ Public Class frmTestForm
                 ' Allow settling time
                 Delay(cfgGlobal.SettlingTime)
 
-                ' Record V and I readings to buffer
-                SwitchIOWrite("node[2].smua.measure.iv(node[2].smua.nvbuffer1, node[2].smua.nvbuffer2)")
-
-                ' Read V and I from buffer
-                dblCurrent = CDbl(SwitchIOWriteRead("printbuffer(1, node[2].smua.nvbuffer1.n, node[2].smua.nvbuffer1)")) * 10 ^ 9
-                dblVolts = CDbl(SwitchIOWriteRead("printbuffer(1, node[2].smua.nvbuffer2.n, node[2].smua.nvbuffer2)"))
-
-                ' Add Channel A readings to data string
+                ' Record IV readings for SMUA
+                decReading = ReadIV("a")
 
                 ' Write string to data file
-                WriteToDataFile(strCurrentReadings & "," & intInjectionCounter & "," & strVoltageReadings & "," & dblCurrent & "," & dblVolts)
+                WriteToDataFile(strCurrentReadings & "," & intInjectionCounter & "," & strVoltageReadings & "," & decReading(0) & "," & decReading(1))
 
                 RefreshGraph()
 
@@ -421,7 +340,6 @@ Public Class frmTestForm
                 If (stpIntervalTimer.ElapsedMilliseconds > intMilliseconds) Then
                     MsgBox("Could not finish measurements within injection interval specified")
                     boolIsTestRunning = False
-                    boolIsTestStopped = True
                 End If
                 Dim intLast As Integer
 
@@ -458,7 +376,7 @@ Public Class frmTestForm
             SwitchIOWrite("node[1].display.settext('Standby')")
 
             ' Update the booleans to reflect the 
-            boolIsTestStopped = True
+            boolIsTestRunning = False
 
             ' Stop the total time timer
             stpTotalTime.Stop()
@@ -678,6 +596,5 @@ Public Class frmTestForm
     End Sub
 
     Private Sub frmTestForm_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
-        TestFormLoaded()
     End Sub
 End Class
